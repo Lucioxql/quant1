@@ -4,20 +4,60 @@
 # @Site : 
 # @File : choose_pool.py
 # @Software: PyCharm
-import tushare as ts
-pro = ts.pro_api()
-def get_code_list(date='20150202'):
-    #创造股票池
-    #默认2010年开始回测
-    dd=pro.daily_basic(trade_date=date)
-    x1=dd.close<100
-    #流通市值低于300亿大于50亿
-    x2=dd.circ_mv>500000
-    x3=dd.circ_mv<3000000
-    #市盈率低于80
-    x4=dd.pe_ttm<80
-    #股息率大于2%
-    x5=dd.dv_ttm>3
-    x=x1&x2&x3&x4&x5
-    stock_list=dd[x].ts_code.values
-    return stock_list
+# 导入包
+import pandas as pd
+import numpy as np
+import os
+import datetime
+
+
+# 获取股票数据（2018-now）-> dict
+
+# 计算财务数据指标 -> dict(code df(2019-now)）
+def get_stockset(dir,start,end1,end2):
+    """
+    计算2018 1.4 - 8.31 盈利水平
+    计算2018 9.31 - 12.31 亏损水平
+    起始日期，截至日期
+    """
+    stockset = dict()
+    stockset['code'] = []
+    stockset['ret1'] = []
+    stockset['ret2'] = []
+    # 更换目录
+    os.chdir(dir)
+    totalset = os.listdir()
+    # 输出所有本地股票收益率及回撤
+    for s in totalset:
+        try:
+            # 计算 1-8月份收益
+            temp = pd.read_csv(s)
+            temp.index = pd.to_datetime(temp['trade_date'].astype(str))
+            temp1 = temp[temp.index > start]
+            first1 = temp1[temp1.index < end1].resample('M').first().close[0]
+            last1 = temp1[temp1.index < end1].resample('M').last().close[-1]
+            ret1 = (last1 - first1)/first1
+            # 计算9-12月收益
+            temp2 = temp[temp.index > end1]
+            temp2 = temp2[temp2.index < end2]
+            first2 = temp2.resample('M').first().close[0]
+            last2 = temp2.resample('M').last().close[-1]
+            ret2 = (last2 - first2)/first2
+            if ret1 > 0.2 and ret2 < -0.3:
+                stockset['code'].append(s[:9])
+                stockset['ret1'].append(ret1)
+                stockset['ret2'].append(ret2)
+        except Exception as e:
+            print(e)
+    return stockset
+
+
+def run_pool(dir):
+    start = datetime.datetime(2018, 1, 1)
+    end1 = datetime.datetime(2018, 8, 31)
+    end2 = datetime.datetime(2018, 12, 31)
+    stock = get_stockset(dir, start, end1, end2)
+    test = pd.DataFrame(stock)
+    last = test.sort_values(by=['ret1'], ascending=False).code
+    return last
+#

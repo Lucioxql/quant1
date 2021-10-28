@@ -9,7 +9,7 @@ class grid_Strategy(bt.Strategy):
     '''
     继承并构建自己的网格策略
     '''
-    print('参数设定')
+    # print('参数设定')
     params = dict(
         # date_in=20,
         # date_add=10,
@@ -29,7 +29,7 @@ class grid_Strategy(bt.Strategy):
             print('%s, %s' % (dt.isoformat(), txt))
 
     def __init__(self):
-        print('只执行一次')
+        # print('只执行一次')
         self.dataclose = self.datas[0].close
         self.order = None
         self.buyprice = None
@@ -48,7 +48,7 @@ class grid_Strategy(bt.Strategy):
         # 判断是否空仓 入市
         if len(self.getposition(self.datas[0])) <= 0:
             self.market_in(self.datas[0], current_price, value)
-        # 非空仓，判断是否止损
+         #非空仓，判断是否止损
         elif current_price <= acc_avg_cost*self.p.stoploss_bench and\
             (value-cash)/value >= 0.5:
             self.log('清仓条件：价格低于成本价，仓位高于50%，清仓线{}'.format(acc_avg_cost*self.p.stoploss_bench))
