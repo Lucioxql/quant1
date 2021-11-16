@@ -66,11 +66,7 @@ class multiGridStrategy(bt.Strategy):
                 cash = self.broker.get_cash()
                 # 返回现在持有现金和市值
                 value = self.broker.get_value()
-                if self.date[d._name]==-1 or (d.datetime.datetime(0) - self.date[d._name]).days >= 1:
-                    self.grid(d, value, cash)
-                    self.date[d._name] = d.datetime.datetime(0)
-                else:
-                    continue
+                self.grid(d, value, cash)
             else:
                 self.close(data=d, stock_code=d._name)
                 self.date[d._name] = d.datetime.datetime(0)
@@ -88,7 +84,9 @@ class multiGridStrategy(bt.Strategy):
         elif current_price <= acc_avg_cost * self.p.stoploss_bench and \
                 (value - cash)/value >= 0.5:  # 总仓位是否超过50%，逻辑有点不通
             self.log('清仓条件：价格低于成本价，仓位高于50%，清仓线{}'.format(acc_avg_cost * self.p.stoploss_bench))
-            self.close(data=data, stock_code=data._name)
+            if self.date[data._name] == -1 or (data.datetime.datetime(0) - self.date[data._name]).days >= 1:
+                self.close(data=data, stock_code=data._name)
+                self.date[data._name] = data.datetime.datetime(0)
         else:
             # self.log('成本价:{}'.format(acc_avg_cost))
             # 仓位调整
@@ -102,9 +100,11 @@ class multiGridStrategy(bt.Strategy):
             cost_order = cash
         # 买多少手
         unit_order = int(cost_order / current_price / 100) * 100
-        self.order = self.buy(data=security, size=unit_order, stock_code=security._name)
-
-
+        if self.date[security._name] == -1 or (security.datetime.datetime(0) - self.date[security._name]).days >= 1:
+            self.order = self.buy(data=security, size=unit_order, stock_code=security._name)
+            self.date[security._name] = security.datetime.datetime(0)
+        else:
+            return
 
     def market_add(self, security, current_price, acc_avg_cost, p_value, cash):
         # 突破加仓线
@@ -116,30 +116,36 @@ class multiGridStrategy(bt.Strategy):
         # 买多少手
         unit_order = int(cost_order / current_price / 100) * 100
         # 判断是否执行
-        if current_price <= break_price_add:
-            # self.log('加仓线：{},买入{}股{},花费{}'.format(break_price_add,
-            # unit_order, security._name, current_price * unit_order))
-            self.order = self.buy(data=security, size=unit_order, stock_code=security._name)
-
-
+        if self.date[security._name] == -1 or (security.datetime.datetime(0) - self.date[security._name]).days >= 1:
+            if current_price <= break_price_add:
+                # self.log('加仓线：{},买入{}股{},花费{}'.format(break_price_add,
+                # unit_order, security._name, current_price * unit_order))
+                self.order = self.buy(data=security, size=unit_order, stock_code=security._name)
+                self.date[security._name] = security.datetime.datetime(0)
+        else:
+            return
 
     def market_sub(self, security, current_price, acc_avg_cost, p_value, cash):
         # 突破减仓线
         break_price_sell = acc_avg_cost * self.p.sell_upper_limit
         # 减仓金额（为什么根据账户价值算？）
         cost_order = p_value * self.p.unit_sell
-        if cost_order >= (self.getposition(security).size*current_price):
-            self.log('清仓{}'.format(break_price_sell))
-            self.close(data=security, stock_code=security._name)
+        if self.date[security._name] == -1 or (security.datetime.datetime(0) - self.date[security._name]).days >= 1:
+            if cost_order >= (self.getposition(security).size*current_price):
+                self.log('清仓{}'.format(break_price_sell))
+                self.close(data=security, stock_code=security._name)
+                self.date[security._name] = security.datetime.datetime(0)
+            else:
+                # 减仓手
+                unit_order = int(cost_order / current_price / 100) * 100
+                if current_price > break_price_sell or current_price <= acc_avg_cost * 0.8:
+                    # 记录这次卖出
+                    # self.log('减仓线：{},卖出{}股{},获得{}'.format(break_price_sell, unit_order,
+                    # security._name, current_price * unit_order))
+                    self.order = self.sell(data=security, size=unit_order, stock_code=security._name)
+                    self.date[security._name] = security.datetime.datetime(0)
         else:
-            # 减仓手
-            unit_order = int(cost_order / current_price / 100) * 100
-            if current_price > break_price_sell or current_price <= acc_avg_cost * 0.8:
-                # 记录这次卖出
-                # self.log('减仓线：{},卖出{}股{},获得{}'.format(break_price_sell, unit_order,
-                # security._name, current_price * unit_order))
-                self.order = self.sell(data=security, size=unit_order, stock_code=security._name)
-
+            return
     def notify_order(self, order):
         # 如果order为submitted/accepted,返回空
         if order.status in [order.Submitted, order.Accepted]:
