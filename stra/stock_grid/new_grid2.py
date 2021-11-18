@@ -22,10 +22,11 @@ class multiGridStrategy(bt.Strategy):
         unit_buy=0.1,
         stoploss_bench=1 - 0.2,
         period=60,
+        count=20,
         printlog=False)
 
 
-    def log(self, txt, dt=None, doprint=True):
+    def log(self, txt, dt=None, doprint=False):
         """日志函数，输出统一的日志格式 """
         if doprint:
             dt = dt or self.datas[0].datetime.date(0)
@@ -43,7 +44,7 @@ class multiGridStrategy(bt.Strategy):
             self.date[d._name] = -1
         self.n = int(len(self.datas)*0.2)
         self.order = None
-        self.c = 20
+        self.c = self.p.count
         self.check = []
 
     def get_check(self):
@@ -59,7 +60,7 @@ class multiGridStrategy(bt.Strategy):
         return check_list
 
     def next(self):
-        if self.c == 20:
+        if self.c == self.p.count:
             self.check = self.get_check()
         for i, d in enumerate(self.datas):
             if d._name in self.check:
@@ -101,7 +102,8 @@ class multiGridStrategy(bt.Strategy):
         if cost_order > cash:
             cost_order = cash
         # 买多少手
-        unit_order = int(cost_order / current_price / 100) * 100
+        unit_order1 = int(cost_order / current_price / 100) * 100
+        unit_order = max(unit_order1, 0)
         self.order = self.buy(data=security, size=unit_order, stock_code=security._name)
 
 
@@ -114,7 +116,8 @@ class multiGridStrategy(bt.Strategy):
         if cost_order > cash:
             cost_order = cash
         # 买多少手
-        unit_order = int(cost_order / current_price / 100) * 100
+        unit_order1 = int(cost_order / current_price / 100) * 100
+        unit_order = max(unit_order1, 0)
         # 判断是否执行
         if current_price <= break_price_add:
             # self.log('加仓线：{},买入{}股{},花费{}'.format(break_price_add,
@@ -133,7 +136,8 @@ class multiGridStrategy(bt.Strategy):
             self.close(data=security, stock_code=security._name)
         else:
             # 减仓手
-            unit_order = int(cost_order / current_price / 100) * 100
+            unit_order1 = int(cost_order / current_price / 100) * 100
+            unit_order = max(unit_order1,0)
             if current_price > break_price_sell or current_price <= acc_avg_cost * 0.8:
                 # 记录这次卖出
                 # self.log('减仓线：{},卖出{}股{},获得{}'.format(break_price_sell, unit_order,

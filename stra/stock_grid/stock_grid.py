@@ -5,38 +5,29 @@
 # @File : sample_strategy.py
 # @Software: PyCharm
 
-from data_feed import *
-from choose_pool import *
-# from stra.sample_strategy import *
-# from stra.test1zhihu import *
-# from stra.grid_strategy import *
-from stra.new_grid2 import *
+
+from new_grid2 import multiGridStrategy
+from mongofeedgrid import MongoData
 import backtrader as bt
-import numpy as np
 import os.path
 from backtrader_plotting import Bokeh
 from backtrader_plotting.schemes import Tradimo
 import datetime
+from pymongo import MongoClient
+
 
 if __name__ == '__main__':
-    dir = 'F:/Quant/数据/量化金融'
-    os.chdir(dir)
-    code_list = os.listdir()
+    c = MongoClient('mongodb://localhost:27017/')
+    db = 'quantfinance'
+    code_list = c[db].collection_names()
     # 具象化实例
     cerebro = bt.Cerebro()
     # 手续费千1
     cerebro.broker.setcommission(commission=0.001)
-
     for code in code_list[:]:
-        data = bt.feeds.GenericCSVData(
+        data = MongoData(
+                db=db,
                 dataname=code,
-                datetime=1,
-                open=2,
-                high=3,
-                low=4,
-                close=5,
-                volume=9,
-                dtformat=('%Y%m%d'),
                 fromdate=datetime.datetime(2016, 5, 3),
                 todate=datetime.datetime(2021, 10, 28))
         cerebro.adddata(data, name=code[:9])
@@ -44,12 +35,12 @@ if __name__ == '__main__':
     # 获取账户价值
     print('开始账户价值：{}'.format(cerebro.broker.getvalue()))
     # 计算最优参数
-    # strats = cerebro.optstrategy(multiGridStrategy, period=range(20, 80, 20), )
-    cerebro.addstrategy(multiGridStrategy, poneplot=False)
+    strats = cerebro.optstrategy(multiGridStrategy, period=range(20, 80, 20), count=range(20, 80, 20))
+    # cerebro.addstrategy(multiGridStrategy, poneplot=False)
     # 加入分析器
     cerebro.addanalyzer(bt.analyzers.DrawDown, _name='DW')
     cerebro.addanalyzer(bt.analyzers.SharpeRatio, _name='SP')
-    strats = cerebro.run(maxcpus=4)
+    strats = cerebro.run()
     strat = strats[0]
     b = Bokeh(style='bar', plot_mode='single', scheme=Tradimo())
     # 绘图
